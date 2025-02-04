@@ -40,6 +40,7 @@ import { makeStyles } from "@mui/styles";
 import { useRouter } from "next/navigation";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import axios from "axios";
+import AWS from "aws-sdk";
 
 import speciesService from "../service/species.js";
 
@@ -154,6 +155,7 @@ const SpeciesManagement = () => {
 	const router = useRouter();
 
 	const [speciesData, setSpeciesData] = useState([]);
+	const [currentAlbum18C, setCurrentAlbum18C] = useState([]);
 	const [isDialogOpen, setIsDialogOpen] = useState(false);
 	const [editingSpecies, setEditingSpecies] = useState(null);
 	const [formValues, setFormValues] = useState({
@@ -213,11 +215,45 @@ const SpeciesManagement = () => {
 	const fetchSpeciesData = async () => {
 		try {
 			const data = await speciesService.getAllSpecies(); // Fetch data from the backend
-
+			openAlbum18C();
 			setSpeciesData(data); // Set the fetched data to state
 		} catch (error) {
 			setAlert({ open: true, message: "Error fetching species data:!", severity: "error" });
 		}
+	};
+
+	// กำหนดค่า AWS SDK
+	const s3 = new AWS.S3({
+		accessKeyId: process.env.NEXT_PUBLIC_AWS_ACCESS_KEY_ID,
+		secretAccessKey: process.env.NEXT_PUBLIC_AWS_SECRET_ACCESS_KEY,
+		region: "us-east-1",
+	});
+
+	const getAlbumImages = async (album) => {
+		console.log(album);
+		const params = {
+			Bucket: "my-image-banpao",
+			Prefix: `${album}/`,
+		};
+
+		try {
+			const data = await s3.listObjectsV2(params).promise();
+
+			console.log(data);
+			return data.Contents.map((file) => `https://d2rw5mzd3w31z9.cloudfront.net/${file.Key}`);
+		} catch (err) {
+			console.error("Error fetching images:", err);
+			return [];
+		}
+	};
+
+	const openAlbum18C = () => {
+		getAlbumImages("18C")
+			.then((images) => {
+				const filteredImages = images.slice(1);
+				setCurrentAlbum18C(filteredImages);
+			})
+			.catch((error) => console.error("Failed to fetch images:", error));
 	};
 
 	const handleRemoveImage = (index) => {
@@ -452,7 +488,7 @@ const SpeciesManagement = () => {
 											<TableRow key={species.id || index}>
 												<TableCell>
 													<img
-														src={`/images/18C/${index + 1 + page}.jpg`}
+														src={currentAlbum18C[index]}
 														alt={species.name}
 														style={{ width: 150, height: "auto", objectFit: "cover", cursor: "pointer" }}
 													/>

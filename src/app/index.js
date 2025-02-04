@@ -1,28 +1,33 @@
 /** @format */
 
-import { Row, Col, Modal, Carousel, Menu, Layout, Form, Input } from "antd";
+import { Row, Col, Modal, Carousel, Menu, Layout, Form, Input, Spin } from "antd";
 import Image from "next/image";
 import styles from "./page.module.css";
 import { DownloadOutlined } from "@ant-design/icons";
-import { Box, Typography, Container, TextField, Button, Grid, IconButton, Snackbar, Alert } from "@mui/material";
+import { Box, Typography, Container, Button, Grid, IconButton, Snackbar, Alert } from "@mui/material";
 import { FaFacebookF, FaLine, FaPhoneAlt } from "react-icons/fa";
 import { useRouter } from "next/navigation";
 
 import userService from "./service/user.js";
 import speciesService from "./service/species.js";
-import ImageJson from "./img.json";
+
+import AWS from "aws-sdk";
 
 import { useState, useEffect } from "react";
 
 const index = () => {
 	const [isModalOpen, setIsModalOpen] = useState(false);
 	const [currentAlbum, setCurrentAlbum] = useState([]);
+	const [currentAlbum18C, setCurrentAlbum18C] = useState([]);
 	const [, setIsClient] = useState(false);
 	const [speciesData, setSpeciesData] = useState([]);
 	const router = useRouter();
 	const [isModalVisible, setIsModalVisible] = useState(false);
 	const [alert, setAlert] = useState({ open: false, message: "", severity: "success" });
 	const [selectedImage, setSelectedImage] = useState(null);
+	const [loading, setLoading] = useState(false);
+	const [currentPage, setCurrentPage] = useState(1);
+	const [pageSize, setPageSize] = useState(6);
 
 	const { Footer } = Layout;
 	useEffect(() => {
@@ -32,7 +37,7 @@ const index = () => {
 		const fetchSpeciesData = async () => {
 			try {
 				const data = await speciesService.getAllSpecies(); // Fetch data from the backend
-
+				openAlbum18C();
 				setSpeciesData(data); // Set the fetched data to state
 			} catch (error) {
 				console.error("Error fetching species data:", error);
@@ -50,6 +55,22 @@ const index = () => {
 		link.click();
 		document.body.removeChild(link);
 	};
+	useEffect(() => {
+		const updatePageSize = () => {
+			if (window.innerWidth > 768) {
+				setPageSize(12); // จอใหญ่ แสดง 12 รูป
+			} else {
+				setPageSize(6); // จอมือถือ แสดง 6 รูป
+			}
+		};
+
+		updatePageSize(); // เรียกครั้งแรก
+		window.addEventListener("resize", updatePageSize); // ติดตามการเปลี่ยนแปลงขนาดจอ
+
+		return () => window.removeEventListener("resize", updatePageSize);
+	}, []);
+
+	const paginatedImages = currentAlbum.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
 	const showModal = () => {
 		setIsModalVisible(true);
@@ -113,52 +134,99 @@ const index = () => {
 		},
 	];
 
-	const albumImagesA = ImageJson.albumImagesA;
-	const albumImagesB = ImageJson.albumImagesB;
+	// กำหนดค่า AWS SDK
+	const s3 = new AWS.S3({
+		accessKeyId: process.env.NEXT_PUBLIC_AWS_ACCESS_KEY_ID,
+		secretAccessKey: process.env.NEXT_PUBLIC_AWS_SECRET_ACCESS_KEY,
+		region: "us-east-1",
+	});
 
-	const openAlbumA = () => {
-		setCurrentAlbum(albumImagesA);
-		setIsModalOpen(true);
+	const getAlbumImages = async (album) => {
+		console.log(album);
+		const params = {
+			Bucket: "my-image-banpao",
+			Prefix: `${album}/`,
+		};
+
+		try {
+			const data = await s3.listObjectsV2(params).promise();
+
+			return data.Contents.map((file) => `https://d2rw5mzd3w31z9.cloudfront.net/${file.Key}`);
+		} catch (err) {
+			console.error("Error fetching images:", err);
+			return [];
+		}
 	};
 
 	const openAlbumB = () => {
-		setCurrentAlbum(albumImagesB);
-		setIsModalOpen(true);
+		setLoading(true);
+		getAlbumImages("albumB2")
+			.then((images) => {
+				// ตัดรายการแรกออกจากอาเรย์
+				const filteredImages = images.slice(1);
+				console.log(filteredImages);
+				setCurrentAlbum(filteredImages);
+				setIsModalOpen(true);
+				setTimeout(() => {
+					setLoading(false); // ปิด Loading หลัง 10 วินาที
+				}, 2000);
+			})
+			.catch((error) => {
+				console.error("Failed to fetch images:", error);
+				setLoading(false); // ปิด Loading กรณีเกิดข้อผิดพลาด
+			});
+	};
+
+	const openAlbumA = () => {
+		setLoading(true);
+		getAlbumImages("albumA2")
+			.then((images) => {
+				// ตัดรายการแรกออกจากอาเรย์
+				const filteredImages = images.slice(1);
+				console.log(filteredImages);
+				setCurrentAlbum(filteredImages);
+				setIsModalOpen(true);
+				setTimeout(() => {
+					setLoading(false); // ปิด Loading หลัง 10 วินาที
+				}, 2000);
+			})
+			.catch((error) => {
+				console.error("Failed to fetch images:", error);
+				setLoading(false); // ปิด Loading กรณีเกิดข้อผิดพลาด
+			});
+	};
+
+	const openAlbum18C = () => {
+		setLoading(true);
+		getAlbumImages("18C")
+			.then((images) => {
+				const filteredImages = images.slice(1); // Slice to remove the first element
+				const sortedImages = filteredImages.sort((a, b) => a - b); // Sort the images sequentially
+				setCurrentAlbum18C(sortedImages);
+			})
+			.catch((error) => console.error("Failed to fetch images:", error))
+			.finally(() => {
+				setLoading(false);
+			});
+	};
+
+	const openAlbum = (id) => {
+		setLoading(true);
+		getAlbumImages(id)
+			.then((images) => {
+				const filteredImages = images.slice(1); // ตัดภาพแรกออก
+				console.log(filteredImages);
+				setCurrentAlbum(filteredImages);
+				setIsModalOpen(true);
+			})
+			.catch((error) => console.error("Failed to fetch images:", error))
+			.finally(() => {
+				setLoading(false);
+			});
 	};
 
 	const openAlbumC = () => {
 		window.open("https://www.facebook.com/profile.php?id=100054831138147&sk=photos&locale=th_TH", "_blank");
-	};
-
-	const openAlbum = (id) => {
-		const albumMap = {
-			1: ImageJson.albumImages1,
-			2: ImageJson.albumImages2,
-			3: ImageJson.albumImages3,
-			4: ImageJson.albumImages4,
-			5: ImageJson.albumImages5,
-			6: ImageJson.albumImages6,
-			7: ImageJson.albumImages7,
-			8: ImageJson.albumImages8,
-			9: ImageJson.albumImages9,
-			10: ImageJson.albumImages10,
-			11: ImageJson.albumImages11,
-			12: ImageJson.albumImages12,
-			13: ImageJson.albumImages13,
-			14: ImageJson.albumImages14,
-			15: ImageJson.albumImages15,
-			16: ImageJson.albumImages16,
-			17: ImageJson.albumImages17,
-			18: ImageJson.albumImages18,
-		};
-
-		const selectedAlbum = albumMap[id];
-		if (selectedAlbum) {
-			setCurrentAlbum(selectedAlbum);
-			setIsModalOpen(true);
-		} else {
-			console.error("Album not found");
-		}
 	};
 
 	return (
@@ -171,7 +239,7 @@ const index = () => {
 					<Carousel autoplay>
 						<div className={styles.carouselItem}>
 							<Image
-								src='/images/albumA/DJI_0530.JPG'
+								src='https://my-image-banpao.s3.us-east-1.amazonaws.com/albumA2/DJI_0530.jpg'
 								alt='Banner 1'
 								width={1920}
 								height={1080}
@@ -190,7 +258,7 @@ const index = () => {
 						</div>
 						<div className={styles.carouselItem}>
 							<Image
-								src='/images/albumA/DJI_0545.JPG'
+								src='https://my-image-banpao.s3.us-east-1.amazonaws.com/albumA2/DJI_0545.jpg'
 								alt='Banner 2'
 								width={1920}
 								height={1080}
@@ -209,7 +277,7 @@ const index = () => {
 						</div>
 						<div className={styles.carouselItem}>
 							<Image
-								src='/images/albumA/DJI_0569.JPG'
+								src='https://my-image-banpao.s3.us-east-1.amazonaws.com/albumA2/DJI_0569.jpg'
 								alt='Banner 3'
 								width={1920}
 								height={1080}
@@ -247,16 +315,19 @@ const index = () => {
 					md={12}
 				>
 					<div className={styles.videoContainer}>
-						<iframe
+						<video
+							controls
+							autoPlay
+							muted
+							preload='auto'
 							className={styles.video}
-							width='100%'
-							height='300px'
-							src='https://www.youtube.com/embed/sm47bqkMs_s'
-							title='YouTube Video'
-							frameBorder='0'
-							allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture'
-							allowFullScreen
-						></iframe>
+						>
+							<source
+								src='https://my-video-storages.s3.us-east-1.amazonaws.com/BanPaoForestParkedit2.mp4'
+								type='video/mp4'
+							/>
+							Your browser does not support the video tag.
+						</video>
 					</div>
 				</Col>
 				<Col
@@ -289,7 +360,7 @@ const index = () => {
 					>
 						<div className={styles.imageContainer}>
 							<Image
-								src='/images/albumB/DSC09696.jpg'
+								src='https://my-image-banpao.s3.us-east-1.amazonaws.com/albumB2/DSC09671.jpg'
 								alt='Album Thumbnail'
 								layout='responsive' // Ensures the image scales responsively
 								width={300}
@@ -297,12 +368,12 @@ const index = () => {
 								className={styles.imageBottom}
 							/>
 							<Image
-								src='/images/albumB/DSC09696.jpg'
+								src='https://my-image-banpao.s3.us-east-1.amazonaws.com/albumA2/DJI_0541.jpg'
 								alt='Second Image'
-								layout='responsive' // Ensures the image scales responsively
 								width={300}
 								height={200}
-								className={styles.imageTop}
+								style={{ width: "100% ", height: "100%" }}
+								className={styles.imageTopA}
 							/>
 						</div>
 						<div className={styles.albumTitleV}>ภาพบรรยากาศ</div>
@@ -322,7 +393,7 @@ const index = () => {
 					>
 						<div className={styles.imageContainer}>
 							<Image
-								src='/images/albumB/DSC09737.jpg'
+								src='https://my-image-banpao.s3.us-east-1.amazonaws.com/albumB2/DSC09737.jpg'
 								alt='Album Thumbnail'
 								layout='responsive' // Ensures the image scales responsively
 								width={300}
@@ -330,7 +401,7 @@ const index = () => {
 								className={styles.imageBottom}
 							/>
 							<Image
-								src='/images/albumB/DSC09685.jpg'
+								src='https://my-image-banpao.s3.us-east-1.amazonaws.com/albumB2/DSC09685.jpg'
 								alt='Second Image'
 								layout='responsive' // Ensures the image scales responsively
 								width={300}
@@ -354,7 +425,7 @@ const index = () => {
 					>
 						<div className={styles.imageContainer}>
 							<Image
-								src='/images/albumB/DSC09685.jpg'
+								src='https://my-image-banpao.s3.us-east-1.amazonaws.com/albumB2/DSC09685.jpg'
 								alt='Album Thumbnail'
 								layout='responsive' // Ensures the image scales responsively
 								width={300}
@@ -391,11 +462,11 @@ const index = () => {
 					>
 						<div
 							className={styles.albumContainer}
-							onClick={() => openAlbum(index + 1)}
+							onClick={() => openAlbum(String(index + 1).padStart(2, "0"))}
 						>
 							{/* Display image dynamically */}
 							<Image
-								src={`/images/18C/${index + 1}.jpg`}
+								src={currentAlbum18C[index]}
 								alt={species.name}
 								layout='responsive'
 								width={300}
@@ -538,7 +609,6 @@ const index = () => {
 					</Container>
 				</Col>
 			</Row>
-			<Row id='login'>{/* Login section content */}</Row>
 			<Footer className={styles.footer}>
 				<Row
 					justify='center'
@@ -628,7 +698,7 @@ const index = () => {
 					</Form.Item>
 				</Form>
 			</Modal>
-			{/* Modal แสดงรูปภาพทั้งหมด */}(
+			{/* Modal แสดงรูปภาพทั้งหมด */}
 			<>
 				{/* Modal แสดงรูปทั้งหมด */}
 				<Modal
@@ -640,62 +710,64 @@ const index = () => {
 					footer={null}
 					width='90%'
 					className={styles.modalCustom}
-					style={{ padding: "16px" }}
+					style={{ padding: "0px 0px" }}
 				>
-					<Row gutter={[8, 8]}>
-						{currentAlbum.map((image, index) => (
-							<Col
-								xs={8} // แสดง 4 คอลัมน์ในหน้าจอเล็ก
-								sm={8} // 3 คอลัมน์ในหน้าจอกลาง
-								md={6} // 4 คอลัมน์ในหน้าจอใหญ่
-								lg={4} // 5 คอลัมน์ในหน้าจอใหญ่ขึ้น
-								key={index}
-								className={styles.modalImageCol}
-							>
-								<div
-									className={styles.imageContainer}
-									style={{ width: "100%" }}
+					{loading ? (
+						<div className={styles.loadingContainer}>
+							<Spin size='large' />
+							<p>กำลังโหลด...</p>
+						</div>
+					) : (
+						<Row gutter={[8, 8]}>
+							{currentAlbum.map((image, index) => (
+								<Col
+									key={index}
+									xs={12}
+									sm={8}
+									md={6}
+									lg={4}
+									className={styles.modalImageCol}
 								>
-									{/* กดเพื่อดาวน์โหลด */}
 									<a
 										onClick={() => downloadBase64Image(image, `Image_${index + 1}.jpg`)}
 										className={styles.downloadIcon}
 									>
 										<DownloadOutlined />
 									</a>
-
-									<Image
-										src={image}
-										alt={`Album Image ${index + 1}`}
-										layout='responsive'
-										width={280}
-										height={200}
-										className={styles.modalImage}
-										preview={undefined} // ปิด preview
-										onClick={() => setSelectedImage(image)} // เปิดภาพขนาดเต็ม
-									/>
-								</div>
-							</Col>
-						))}
-					</Row>
+									<div className={styles.imageContainer}>
+										<Image
+											src={image}
+											alt={`Album Image ${index + 1}`}
+											layout='responsive'
+											width={280}
+											height={200}
+											className={styles.modalImage}
+											loading='lazy'
+											onClick={() => setSelectedImage(image)}
+										/>
+									</div>
+								</Col>
+							))}
+						</Row>
+					)}
 				</Modal>
 
+				{/* Full Image Modal */}
 				<Modal
 					open={!!selectedImage}
 					onCancel={() => setSelectedImage(null)}
 					footer={null}
 					centered
-					width='50vw'
+					width='100vw'
 					className={styles.fullImageModal}
 				>
 					<Image
 						src={selectedImage}
 						alt='Full Size'
-						layout='intrinsic' // ใช้ให้รูปไม่แตก
-						width={1000} // ตั้งค่าขนาดรูปจริง
+						width={600}
 						height={600}
-						className={styles.fullImage}
-						style={{ objectFit: "contain", width: "100%", height: "auto" }} // ป้องกันรูปแตก
+						className={styles.fullImage} // Use the class defined in your CSS file
+						style={{ objectFit: "contain" }} // Apply only non-media-query styles here
 					/>
 				</Modal>
 			</>
