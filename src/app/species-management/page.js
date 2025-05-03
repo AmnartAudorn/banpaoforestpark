@@ -42,6 +42,8 @@ import { createTheme, ThemeProvider } from "@mui/material/styles";
 import axios from "axios";
 import AWS from "aws-sdk";
 
+import albums from "../img.json";
+
 import speciesService from "../service/species.js";
 
 // Create a Material-UI theme
@@ -229,31 +231,21 @@ const SpeciesManagement = () => {
 		region: "us-east-1",
 	});
 
-	const getAlbumImages = async (album) => {
-		console.log(album);
-		const params = {
-			Bucket: "my-image-banpao",
-			Prefix: `${album}/`,
-		};
+	const getAlbumImages = (album) => {
+		const albumData = albums[album];
+		if (!albumData || albumData.length === 0) return [];
 
-		try {
-			const data = await s3.listObjectsV2(params).promise();
-
-			console.log(data);
-			return data.Contents.map((file) => `https://d2rw5mzd3w31z9.cloudfront.net/${file.Key}`);
-		} catch (err) {
-			console.error("Error fetching images:", err);
-			return [];
-		}
+		return Object.values(albumData[0]); // คืนค่ารูปภาพเป็น array
 	};
 
-	const openAlbum18C = () => {
-		getAlbumImages("18C")
-			.then((images) => {
-				const filteredImages = images.slice(1);
-				setCurrentAlbum18C(filteredImages);
-			})
-			.catch((error) => console.error("Failed to fetch images:", error));
+	const openAlbum18C = async () => {
+		try {
+			const images = await getAlbumImages("18C");
+			const filteredImages = images.slice(0);
+			setCurrentAlbum18C(filteredImages);
+		} catch (error) {
+			console.error("Failed to fetch images:", error);
+		}
 	};
 
 	const handleRemoveImage = (index) => {

@@ -75,7 +75,7 @@
 }
 
 .video {
-  width: 100%;
+  width: 80%;
   max-height: auto;
   box-shadow: 1px 5px 15px rgba(0, 0, 0, 2.2);
 }
@@ -535,5 +535,11 @@
     width: 100%;
     height: auto;
     margin-left: 0;
+  }
+
+  .video {
+    width: 100%;
+    max-height: auto;
+    box-shadow: 1px 5px 15px rgba(0, 0, 0, 2.2);
   }
 }

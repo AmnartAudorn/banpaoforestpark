@@ -7,6 +7,7 @@ import { DownloadOutlined } from "@ant-design/icons";
 import { Box, Typography, Container, Button, Grid, IconButton, Snackbar, Alert } from "@mui/material";
 import { FaFacebookF, FaLine, FaPhoneAlt } from "react-icons/fa";
 import { useRouter } from "next/navigation";
+import albums from "./img.json";
 
 import userService from "./service/user.js";
 import speciesService from "./service/species.js";
@@ -141,88 +142,89 @@ const index = () => {
 		region: "us-east-1",
 	});
 
-	const getAlbumImages = async (album) => {
-		console.log(album);
-		const params = {
-			Bucket: "my-image-banpao",
-			Prefix: `${album}/`,
-		};
+	const getAlbumImages = (album) => {
+		const albumData = albums[album];
+		if (!albumData || albumData.length === 0) return [];
 
+		return Object.values(albumData[0]); // คืนค่ารูปภาพเป็น array
+	};
+
+	// const getAlbumImages = async (album) => {
+	// 	console.log(album);
+	// 	const params = {
+	// 		Bucket: "my-image-banpao",
+	// 		Prefix: `${album}/`,
+	// 	};
+
+	// 	try {
+	// 		const data = await s3.listObjectsV2(params).promise();
+
+	// 		return data.Contents.map((file) => `https://d2rw5mzd3w31z9.cloudfront.net/${file.Key}`);
+	// 	} catch (err) {
+	// 		console.error("Error fetching images:", err);
+	// 		return [];
+	// 	}
+	// };
+
+	const openAlbumA = async () => {
+		setLoading(true);
 		try {
-			const data = await s3.listObjectsV2(params).promise();
-
-			return data.Contents.map((file) => `https://d2rw5mzd3w31z9.cloudfront.net/${file.Key}`);
-		} catch (err) {
-			console.error("Error fetching images:", err);
-			return [];
+			const images = await getAlbumImages("albumA");
+			const filteredImages = images.slice(0);
+			setCurrentAlbum(filteredImages);
+			setIsModalOpen(true);
+			setTimeout(() => {
+				setLoading(false);
+			}, 2000);
+		} catch (error) {
+			console.error("Failed to fetch images:", error);
+			setLoading(false);
 		}
 	};
 
-	const openAlbumB = () => {
+	const openAlbumB = async () => {
 		setLoading(true);
-		getAlbumImages("albumB2")
-			.then((images) => {
-				// ตัดรายการแรกออกจากอาเรย์
-				const filteredImages = images.slice(1);
-				console.log(filteredImages);
-				setCurrentAlbum(filteredImages);
-				setIsModalOpen(true);
-				setTimeout(() => {
-					setLoading(false); // ปิด Loading หลัง 10 วินาที
-				}, 2000);
-			})
-			.catch((error) => {
-				console.error("Failed to fetch images:", error);
-				setLoading(false); // ปิด Loading กรณีเกิดข้อผิดพลาด
-			});
-	};
-
-	const openAlbumA = () => {
-		setLoading(true);
-		getAlbumImages("albumA2")
-			.then((images) => {
-				// ตัดรายการแรกออกจากอาเรย์
-				const filteredImages = images.slice(1);
-				console.log(filteredImages);
-				setCurrentAlbum(filteredImages);
-				setIsModalOpen(true);
-				setTimeout(() => {
-					setLoading(false); // ปิด Loading หลัง 10 วินาที
-				}, 2000);
-			})
-			.catch((error) => {
-				console.error("Failed to fetch images:", error);
-				setLoading(false); // ปิด Loading กรณีเกิดข้อผิดพลาด
-			});
-	};
-
-	const openAlbum18C = () => {
-		setLoading(true);
-		getAlbumImages("18C")
-			.then((images) => {
-				const filteredImages = images.slice(1); // Slice to remove the first element
-				const sortedImages = filteredImages.sort((a, b) => a - b); // Sort the images sequentially
-				setCurrentAlbum18C(sortedImages);
-			})
-			.catch((error) => console.error("Failed to fetch images:", error))
-			.finally(() => {
+		try {
+			const images = await getAlbumImages("albumB2");
+			const filteredImages = images.slice(0);
+			setCurrentAlbum(filteredImages);
+			setIsModalOpen(true);
+			setTimeout(() => {
 				setLoading(false);
-			});
+			}, 2000);
+		} catch (error) {
+			console.error("Failed to fetch images:", error);
+			setLoading(false);
+		}
+	};
+
+	const openAlbum18C = async () => {
+		setLoading(true);
+		try {
+			const images = await getAlbumImages("18C");
+			const filteredImages = images.slice(0);
+			setCurrentAlbum18C(filteredImages);
+		} catch (error) {
+			console.error("Failed to fetch images:", error);
+		} finally {
+			setLoading(false);
+		}
 	};
 
 	const openAlbum = (id) => {
+		console.log(id);
 		setLoading(true);
-		getAlbumImages(id)
-			.then((images) => {
-				const filteredImages = images.slice(1); // ตัดภาพแรกออก
-				console.log(filteredImages);
-				setCurrentAlbum(filteredImages);
-				setIsModalOpen(true);
-			})
-			.catch((error) => console.error("Failed to fetch images:", error))
-			.finally(() => {
-				setLoading(false);
-			});
+		try {
+			const images = getAlbumImages(id);
+			const filteredImages = images.slice(0); // ไม่ได้ตัดภาพแรกออกจริง ๆ
+			console.log(filteredImages);
+			setCurrentAlbum(filteredImages);
+			setIsModalOpen(true);
+		} catch (error) {
+			console.error("Failed to fetch images:", error);
+		} finally {
+			setLoading(false);
+		}
 	};
 
 	const openAlbumC = () => {
@@ -239,7 +241,7 @@ const index = () => {
 					<Carousel autoplay>
 						<div className={styles.carouselItem}>
 							<Image
-								src='https://my-image-banpao.s3.us-east-1.amazonaws.com/albumA2/DJI_0530.jpg'
+								src='https://shorturl.asia/bm3cB'
 								alt='Banner 1'
 								width={1920}
 								height={1080}
@@ -258,7 +260,7 @@ const index = () => {
 						</div>
 						<div className={styles.carouselItem}>
 							<Image
-								src='https://my-image-banpao.s3.us-east-1.amazonaws.com/albumA2/DJI_0545.jpg'
+								src='https://shorturl.asia/wDdUO'
 								alt='Banner 2'
 								width={1920}
 								height={1080}
@@ -277,7 +279,7 @@ const index = () => {
 						</div>
 						<div className={styles.carouselItem}>
 							<Image
-								src='https://my-image-banpao.s3.us-east-1.amazonaws.com/albumA2/DJI_0569.jpg'
+								src='https://shorturl.asia/QwIaH'
 								alt='Banner 3'
 								width={1920}
 								height={1080}
@@ -317,13 +319,10 @@ const index = () => {
 					<div className={styles.videoContainer}>
 						<video
 							controls
-							autoPlay
-							muted
-							preload='auto'
 							className={styles.video}
 						>
 							<source
-								src='https://my-video-storages.s3.us-east-1.amazonaws.com/BanPaoForestParkedit2.mp4'
+								src='/videos/BanpaoForestPark.mp4'
 								type='video/mp4'
 							/>
 							Your browser does not support the video tag.
@@ -360,20 +359,18 @@ const index = () => {
 					>
 						<div className={styles.imageContainer}>
 							<Image
-								src='https://my-image-banpao.s3.us-east-1.amazonaws.com/albumB2/DSC09671.jpg'
+								src='https://shorturl.asia/mqTLr'
 								alt='Album Thumbnail'
-								layout='responsive' // Ensures the image scales responsively
 								width={300}
 								height={200}
 								className={styles.imageBottom}
 							/>
 							<Image
-								src='https://my-image-banpao.s3.us-east-1.amazonaws.com/albumA2/DJI_0541.jpg'
+								src='https://shorturl.asia/YGoPJ'
 								alt='Second Image'
 								width={300}
 								height={200}
-								style={{ width: "100% ", height: "100%" }}
-								className={styles.imageTopA}
+								className={styles.imageTop}
 							/>
 						</div>
 						<div className={styles.albumTitleV}>ภาพบรรยากาศ</div>
@@ -393,17 +390,15 @@ const index = () => {
 					>
 						<div className={styles.imageContainer}>
 							<Image
-								src='https://my-image-banpao.s3.us-east-1.amazonaws.com/albumB2/DSC09737.jpg'
+								src='https://shorturl.asia/63sht'
 								alt='Album Thumbnail'
-								layout='responsive' // Ensures the image scales responsively
 								width={300}
-								height={250}
+								height={200}
 								className={styles.imageBottom}
 							/>
 							<Image
-								src='https://my-image-banpao.s3.us-east-1.amazonaws.com/albumB2/DSC09685.jpg'
+								src='https://shorturl.asia/63sht'
 								alt='Second Image'
-								layout='responsive' // Ensures the image scales responsively
 								width={300}
 								height={200}
 								className={styles.imageTop}
@@ -412,6 +407,7 @@ const index = () => {
 						<div className={styles.albumTitleV}>ภาพรวมต้นไม้</div>
 					</div>
 				</Col>
+
 				<Col
 					xs={24}
 					sm={8}
@@ -425,9 +421,8 @@ const index = () => {
 					>
 						<div className={styles.imageContainer}>
 							<Image
-								src='https://my-image-banpao.s3.us-east-1.amazonaws.com/albumB2/DSC09685.jpg'
+								src='/images/FUN02.jpg'
 								alt='Album Thumbnail'
-								layout='responsive' // Ensures the image scales responsively
 								width={300}
 								height={200}
 								className={styles.imageBottom}
@@ -435,7 +430,6 @@ const index = () => {
 							<Image
 								src='/images/FUN01.jpg'
 								alt='Second Image'
-								layout='responsive' // Ensures the image scales responsively
 								width={300}
 								height={200}
 								className={styles.imageTop}
@@ -462,7 +456,7 @@ const index = () => {
 					>
 						<div
 							className={styles.albumContainer}
-							onClick={() => openAlbum(String(index + 1).padStart(2, "0"))}
+							onClick={() => openAlbum(String(index + 1))}
 						>
 							{/* Display image dynamically */}
 							<Image
