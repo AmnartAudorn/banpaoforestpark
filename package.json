@@ -18,7 +18,7 @@
 		"@mui/styles": "^6.4.1",
 		"antd": "^5.23.2",
 		"aws-sdk": "^2.1692.0",
-		"axios": "^1.7.9",
+		"axios": "^1.12.0",
 		"browser-image-compression": "^2.0.2",
 		"cors": "^2.8.5",
 		"firebase": "^11.2.0",
